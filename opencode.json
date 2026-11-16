@@ -1,0 +1,31 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "share": "disabled",
+  "skills": {
+    "paths": [
+      "/Users/alexander/.claude/skills/frontend-design",
+      "/Users/alexander/Desktop/Cursos/ProyectosWindows/constructora-erp/.opencode/skills/refactoring-ui",
+      "/Users/alexander/Desktop/Cursos/ProyectosWindows/constructora-erp/.opencode/skills/ux-heuristics",
+      "/Users/alexander/Desktop/Cursos/ProyectosWindows/constructora-erp/.opencode/skills/web-typography",
+      "/Users/alexander/Desktop/Cursos/ProyectosWindows/constructora-erp/.opencode/skills/microinteractions"
+    ]
+  },
+  "permission": {
+    "skill": {
+      "*": "deny",
+      "customize-opencode": "allow",
+      "security-review": "allow",
+      "dataviz": "allow",
+      "run-project": "allow",
+      "simplify-changes": "allow",
+      "frontend-design": "allow",
+      "refactoring-ui": "allow",
+      "ux-heuristics": "allow",
+      "web-typography": "allow",
+      "microinteractions": "allow",
+      "verification-loop": "allow",
+      "e2e-testing": "allow",
+      "graphify-local": "allow"
+    }
+  }
+}

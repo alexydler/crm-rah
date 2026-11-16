@@ -1,0 +1,58 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+graphify_bin=$(command -v graphify) || {
+  printf '%s\n' 'Graphify is missing. Review installation before proceeding.' >&2
+  exit 1
+}
+if [ ! -x /usr/bin/sandbox-exec ]; then
+  printf '%s\n' 'This audited macOS profile requires sandbox-exec; no unsafe fallback.' >&2
+  exit 1
+fi
+graph="$root/graphify-out/graph.json"
+action=${1:-help}
+if [ "$#" -gt 0 ]; then shift; fi
+case "$action:$#" in
+  build:0)
+    set -- extract "$root" --code-only --force --max-workers 1
+    ;;
+  query:1)
+    set -- query "$1" --budget 1500 --graph "$graph"
+    ;;
+  path:2)
+    set -- path "$1" "$2" --graph "$graph"
+    ;;
+  explain:1)
+    set -- explain "$1" --graph "$graph"
+    ;;
+  affected:1)
+    set -- affected "$1" --depth 2 --graph "$graph"
+    ;;
+  diagnose:0)
+    set -- diagnose multigraph --graph "$graph"
+    ;;
+  help:0|--help:0)
+    printf '%s\n' \
+      'Usage: sh .opencode/bin/graphify-local build' \
+      '       sh .opencode/bin/graphify-local query "symbol or question"' \
+      '       sh .opencode/bin/graphify-local path "source" "target"' \
+      '       sh .opencode/bin/graphify-local explain "symbol"' \
+      '       sh .opencode/bin/graphify-local affected "symbol"' \
+      '       sh .opencode/bin/graphify-local diagnose'
+    exit 0
+    ;;
+  *)
+    printf '%s\n' 'Unsupported command or argument count. Use --help.' >&2
+    exit 2
+    ;;
+esac
+
+# Do not inherit provider credentials, proxies, hooks or extraction overrides.
+cd "$root"
+exec /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \
+  /usr/bin/env -i HOME="$HOME" PATH="$PATH" \
+  PYTHONDONTWRITEBYTECODE=1 PYTHONNOUSERSITE=1 \
+  GRAPHIFY_GOOGLE_WORKSPACE=0 GRAPHIFY_QUERY_LOG_DISABLE=1 \
+  GRAPHIFY_ALLOW_LOCAL_PROVIDERS=0 \
+  "$graphify_bin" "$@"

@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+*.pyc
+node_modules/
+.next/
+dist/
+.DS_Store
+*.log
+
+# Local AI navigation artifacts, not application source
+graphify-out/
+.graphify/
+.graphify-cache/
