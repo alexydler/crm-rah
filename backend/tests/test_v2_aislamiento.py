@@ -8,7 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from tests.datos import (
-    ORG_A, ORG_B, ORG_SUSP, ORG_V1_DEMO, SUB_A, SUB_AB, SUB_B, SUB_CONS, SUB_MKT, SUB_NADIE, SUB_SUSP,
+    ORG_A, ORG_B, ORG_SUSP, SUB_A, SUB_AB, SUB_B, SUB_CONS, SUB_DESCONOCIDO, SUB_MKT, SUB_NADIE, SUB_SUSP,
 )
 
 BASE = {
@@ -224,11 +224,15 @@ def test_esquema_basic_no_es_bearer(client):
 
 def test_marketing_no_revoca_miembros(client, datos, auth_header, admin_engine):
     with admin_engine.connect() as c:
-        m_cons = c.scalar(text('SELECT id FROM membresias WHERE usuario_sub = :s'), {'s': SUB_CONS})
+        m_cons = c.scalar(text('SELECT m.id FROM membresias m JOIN usuarios u ON u.id = m.usuario_id WHERE u.subject = :s'), {'s': SUB_CONS})
     r = client.delete(url(ORG_A, 'membresias', m_cons), headers=auth_header(SUB_MKT))
     assert r.status_code == 403
     with admin_engine.connect() as c:
         assert c.scalar(text('SELECT estatus FROM membresias WHERE id = :i'), {'i': m_cons}) == 'activa'
+    # Propietario sí puede; queda `inactiva` (no se borra la fila).
+    assert client.delete(url(ORG_A, 'membresias', m_cons), headers=datos['ha']).status_code == 204
+    with admin_engine.connect() as c:
+        assert c.scalar(text('SELECT estatus FROM membresias WHERE id = :i'), {'i': m_cons}) == 'inactiva'
 
 
 @pytest.mark.parametrize('sub', [SUB_MKT, SUB_CONS])
@@ -241,10 +245,26 @@ def test_roles_lectura_no_escriben(client, datos, auth_header, sub):
     assert subir_foto(client, h, ORG_A, ia).status_code == 403
 
 
-def test_sin_membresia_403(client, auth_header):
-    assert client.get(url(ORG_A, 'inmuebles'), headers=auth_header(SUB_NADIE)).status_code == 403
-    r = client.get('/api/v2/me', headers=auth_header(SUB_NADIE))
+@pytest.mark.parametrize('sub', [SUB_NADIE, SUB_DESCONOCIDO])
+def test_sin_membresia_403(client, auth_header, sub):
+    assert client.get(url(ORG_A, 'inmuebles'), headers=auth_header(sub)).status_code == 403
+    r = client.get('/api/v2/me', headers=auth_header(sub))
     assert r.status_code == 200 and r.json()['organizaciones'] == []
+
+
+def test_claims_de_org_o_rol_en_token_ignorados(client, datos, auth_header):
+    # El realm DEV emite mappers `organizaciones`/`rol`: el backend NO los usa para autorizar.
+    h = auth_header(SUB_A, extra={'organizaciones': [str(ORG_B)], 'rol': 'propietario',
+                                  'organizacion_id': str(ORG_B)})
+    assert client.get(url(ORG_B, 'inmuebles'), headers=h).status_code == 403
+    h = auth_header(SUB_CONS, extra={'rol': 'propietario'})
+    assert client.post(url(ORG_A, 'inmuebles'), json=BASE, headers=h).status_code == 403
+
+
+def test_usuario_desactivado_403(client, datos, admin_engine):
+    with admin_engine.begin() as c:
+        c.execute(text("UPDATE usuarios SET estado = 'bloqueado' WHERE subject = :s"), {'s': SUB_A})
+    assert client.get(url(ORG_A, 'inmuebles'), headers=datos['ha']).status_code == 403
 
 
 def test_organizacion_suspendida_403(client, auth_header):
@@ -311,7 +331,7 @@ def test_revocacion_aplica_en_siguiente_request(client, datos, auth_header, admi
     h_ab = auth_header(SUB_AB)  # el mismo token sigue siendo criptográficamente válido
     assert client.get(url(ORG_A, 'inmuebles'), headers=h_ab).status_code == 200
     with admin_engine.connect() as c:
-        m = c.scalar(text('SELECT id FROM membresias WHERE usuario_sub = :s AND organizacion_id = :o'),
+        m = c.scalar(text('SELECT m.id FROM membresias m JOIN usuarios u ON u.id = m.usuario_id WHERE u.subject = :s AND m.organizacion_id = :o'),
                      {'s': SUB_AB, 'o': ORG_A})
     assert client.delete(url(ORG_A, 'membresias', m), headers=datos['ha']).status_code == 204
     assert client.get(url(ORG_A, 'inmuebles'), headers=h_ab).status_code == 403
@@ -323,7 +343,7 @@ def test_revocacion_aplica_en_siguiente_request(client, datos, auth_header, admi
 
 def test_propietario_no_revoca_membresia_de_otra_org(client, datos, admin_engine):
     with admin_engine.connect() as c:
-        m_b = c.scalar(text('SELECT id FROM membresias WHERE usuario_sub = :s'), {'s': SUB_B})
+        m_b = c.scalar(text('SELECT m.id FROM membresias m JOIN usuarios u ON u.id = m.usuario_id WHERE u.subject = :s'), {'s': SUB_B})
     assert client.delete(url(ORG_A, 'membresias', m_b), headers=datos['ha']).status_code == 404
 
 

@@ -16,7 +16,10 @@ SUB_AB = 'sub-demo-ab'        # gerente en A y en B
 SUB_MKT = 'sub-demo-mkt'      # marketing en A
 SUB_CONS = 'sub-demo-consulta'  # consulta en A
 SUB_SUSP = 'sub-demo-susp'    # propietario de org suspendida
-SUB_NADIE = 'sub-demo-sin-membresia'
+SUB_NADIE = 'sub-demo-sin-membresia'  # existe en `usuarios`, sin membresías
+SUB_DESCONOCIDO = 'sub-demo-no-provisionado'  # token válido, sin fila en `usuarios`
+
+USUARIOS = [SUB_A, SUB_B, SUB_AB, SUB_MKT, SUB_CONS, SUB_SUSP, SUB_NADIE]
 
 MEMBRESIAS = [
     (ORG_A, SUB_A, 'propietario'), (ORG_B, SUB_B, 'propietario'),

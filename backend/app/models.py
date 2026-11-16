@@ -1,7 +1,8 @@
 """Modelos SQLAlchemy.
 
-Los modelos multiorganización siguen ``db/design/ESQUEMA_OBJETIVO.md``. La migración real
-(Alembic, RLS, roles) la entrega el DBA en ``db/``; estos modelos NO crean tablas en runtime.
+Alineados con la migración del DBA ``db/migrations/0001_sprint02_multiagencia.sql`` (rama
+sprint02-db, commit 7994e89) y con ``db/design/ESQUEMA_OBJETIVO.md``. Estos modelos NO crean
+tablas en runtime: el esquema lo gestiona Alembic en ``db/``.
 """
 from datetime import datetime
 from decimal import Decimal
@@ -15,10 +16,11 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-# Valores propuestos; confirmar con el integrador antes de fijarlos como contrato.
+# Valores de los CHECK de la migración 0001.
 ROLES = ('propietario', 'gerente', 'asesor', 'marketing', 'consulta')
-ESTATUS_ORGANIZACION = ('activa', 'suspendida')
-ESTATUS_MEMBRESIA = ('activa', 'revocada')
+ESTATUS_ORGANIZACION = ('activa', 'suspendida', 'inactiva')
+ESTATUS_MEMBRESIA = ('activa', 'inactiva', 'invitado')
+ESTADO_USUARIO = ('activo', 'inactivo', 'bloqueado')
 
 
 class Base(DeclarativeBase):
@@ -30,24 +32,41 @@ class Organizacion(Base):
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     slug: Mapped[str] = mapped_column(String(80), unique=True)
-    nombre: Mapped[str] = mapped_column(String(180))
-    estatus: Mapped[str] = mapped_column(String(20), default='activa')
+    nombre_comercial: Mapped[str] = mapped_column(String(160))
+    estatus: Mapped[str] = mapped_column(String(20), default='activa', server_default=text("'activa'"))
+    moneda_preferida: Mapped[str] = mapped_column(String(3), default='USD', server_default=text("'USD'"))
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Usuario(Base):
+    """Identidad global (sin datos de agencias). ``subject`` = claim ``sub`` del token OIDC."""
+
+    __tablename__ = 'usuarios'
+
+    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    proveedor_auth: Mapped[str] = mapped_column(String(40), default='keycloak', server_default=text("'keycloak'"))
+    subject: Mapped[str] = mapped_column(String(120), unique=True)
+    email: Mapped[str] = mapped_column(String(160), unique=True)
+    nombre_completo: Mapped[str | None] = mapped_column(String(160))
+    estado: Mapped[str] = mapped_column(String(20), default='activo', server_default=text("'activo'"))
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Membresia(Base):
-    """Un usuario global (``sub`` OIDC) puede tener varias membresías, una por organización."""
+    """Un usuario global puede tener varias membresías, una por organización."""
 
     __tablename__ = 'membresias'
-    __table_args__ = (UniqueConstraint('organizacion_id', 'usuario_sub', name='uq_membresias_org_sub'),)
+    __table_args__ = (UniqueConstraint('organizacion_id', 'usuario_id', name='uq_membresias_org_usuario'),)
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     organizacion_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey('organizaciones.id', ondelete='CASCADE'), index=True
+        PGUUID(as_uuid=True), ForeignKey('organizaciones.id', ondelete='CASCADE')
     )
-    usuario_sub: Mapped[str] = mapped_column(String(255), index=True)
-    rol: Mapped[str] = mapped_column(String(24))
-    estatus: Mapped[str] = mapped_column(String(20), default='activa')
+    usuario_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey('usuarios.id', ondelete='CASCADE'))
+    rol: Mapped[str] = mapped_column(String(30))
+    estatus: Mapped[str] = mapped_column(String(20), default='activa', server_default=text("'activa'"))
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -58,14 +77,14 @@ class Inmueble(Base):
         UniqueConstraint('organizacion_id', 'id', name='uq_inmuebles_org_id'),
         # Referencia única POR organización, no global.
         Index(
-            'uq_inmuebles_org_referencia', 'organizacion_id', 'codigo_referencia', unique=True,
+            'idx_inmuebles_org_codigo_referencia', 'organizacion_id', 'codigo_referencia', unique=True,
             postgresql_where=text('codigo_referencia IS NOT NULL'),
         ),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     organizacion_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey('organizaciones.id', ondelete='RESTRICT'), index=True
+        PGUUID(as_uuid=True), ForeignKey('organizaciones.id', ondelete='CASCADE')
     )
     titulo: Mapped[str] = mapped_column(String(180))
     tipo: Mapped[str] = mapped_column(String(24))
@@ -102,7 +121,7 @@ class InmuebleMedia(Base):
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     organizacion_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=True), ForeignKey('organizaciones.id', ondelete='RESTRICT'), index=True
+        PGUUID(as_uuid=True)
     )
     inmueble_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True))
     object_key: Mapped[str] = mapped_column(Text, unique=True)

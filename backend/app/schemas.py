@@ -117,7 +117,7 @@ class InmuebleOutV2(InmuebleOut):
 class OrganizacionOut(BaseModel):
     id: UUID
     slug: str
-    nombre: str
+    nombre_comercial: str
     rol: Rol
 
 

@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from .auth import Usuario, get_current_user
 from .db import bind_tenant, get_db
-from .models import Membresia, Organizacion
+from .models import Membresia, Organizacion, Usuario as UsuarioDB
 
 # Permisos por acción (primera iteración, ver docs/ARQUITECTURA_MULTIAGENCIA.md).
 # `asesor` aún no puede editar/subir fotos: falta `asignado_membresia_id` para limitarlo a su
@@ -38,8 +38,10 @@ def membresias_activas(db: Session, sub: str) -> list[tuple[Membresia, Organizac
     stmt = (
         select(Membresia, Organizacion)
         .join(Organizacion, Organizacion.id == Membresia.organizacion_id)
-        .where(Membresia.usuario_sub == sub, Membresia.estatus == 'activa', Organizacion.estatus == 'activa')
-        .order_by(Organizacion.nombre.asc())
+        .join(UsuarioDB, UsuarioDB.id == Membresia.usuario_id)
+        .where(UsuarioDB.subject == sub, UsuarioDB.estado == 'activo',
+               Membresia.estatus == 'activa', Organizacion.estatus == 'activa')
+        .order_by(Organizacion.nombre_comercial.asc())
     )
     return [(m, o) for m, o in db.execute(stmt).all()]
 
@@ -54,9 +56,11 @@ def get_contexto(
     membresia = db.scalar(
         select(Membresia)
         .join(Organizacion, Organizacion.id == Membresia.organizacion_id)
+        .join(UsuarioDB, UsuarioDB.id == Membresia.usuario_id)
         .where(
             Membresia.organizacion_id == org_id,
-            Membresia.usuario_sub == usuario.sub,
+            UsuarioDB.subject == usuario.sub,
+            UsuarioDB.estado == 'activo',
             Membresia.estatus == 'activa',
             Organizacion.estatus == 'activa',
         )

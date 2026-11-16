@@ -40,7 +40,7 @@ def _audit(ctx: Contexto, accion: str, objetivo: UUID) -> None:
 
 def _organizaciones_de(db: Session, usuario: Usuario) -> list[OrganizacionOut]:
     bind_tenant(db, None, usuario.sub)
-    return [OrganizacionOut(id=o.id, slug=o.slug, nombre=o.nombre, rol=m.rol)
+    return [OrganizacionOut(id=o.id, slug=o.slug, nombre_comercial=o.nombre_comercial, rol=m.rol)
             for m, o in membresias_activas(db, usuario.sub)]
 
 
@@ -65,7 +65,7 @@ def _media_out(ctx: Contexto, media: InmuebleMedia, storage: Storage) -> MediaOu
 
 
 def _es_referencia_duplicada(exc: IntegrityError) -> bool:
-    return 'uq_inmuebles_org_referencia' in str(exc.orig)
+    return 'idx_inmuebles_org_codigo_referencia' in str(exc.orig)
 
 
 # ------------------------------------------------------------------ identidad y organización
@@ -85,14 +85,15 @@ def mis_organizaciones(usuario: Usuario = Depends(get_current_user), db: Session
 @router.get(ORG, response_model=OrganizacionOut)
 def leer_organizacion(ctx: Contexto = Depends(requiere(LEER)), db: Session = Depends(get_db)):
     org = db.get(Organizacion, ctx.organizacion_id)
-    return OrganizacionOut(id=org.id, slug=org.slug, nombre=org.nombre, rol=ctx.rol)
+    return OrganizacionOut(id=org.id, slug=org.slug, nombre_comercial=org.nombre_comercial, rol=ctx.rol)
 
 
 @router.delete(ORG + '/membresias/{membresia_id}', status_code=204)
 def revocar_membresia(
     membresia_id: UUID, ctx: Contexto = Depends(requiere(GESTIONAR_MIEMBROS)), db: Session = Depends(get_db),
 ):
-    """PROPUESTA fuera del contrato v2 actual (lo exige la matriz de aceptación). Revoca, no borra."""
+    """PROPUESTA fuera del contrato v2 actual (lo exige la matriz de aceptación).
+    No borra la fila: la marca `inactiva` (valor del CHECK de la migración 0001)."""
     membresia = db.scalar(
         select(Membresia).where(Membresia.organizacion_id == ctx.organizacion_id, Membresia.id == membresia_id)
     )
@@ -100,7 +101,7 @@ def revocar_membresia(
         raise HTTPException(status.HTTP_404_NOT_FOUND, 'Membresía no encontrada')
     if membresia.id == ctx.membresia_id:
         raise HTTPException(status.HTTP_409_CONFLICT, 'No puedes revocar tu propia membresía')
-    membresia.estatus = 'revocada'
+    membresia.estatus = 'inactiva'
     db.commit()
     _audit(ctx, 'membresia.revocar', membresia_id)
 

@@ -4,9 +4,10 @@
   si no, se crea un cluster temporal con ``initdb``/``pg_ctl`` (``PG_BIN`` o
   ``/Library/PostgreSQL/16/bin``, ``/usr/lib/postgresql/16/bin``). Sin PostgreSQL disponible,
   las pruebas de integración se OMITEN (skip) indicándolo; nunca se simulan con SQLite.
-- Esquema: ``Base.metadata.create_all`` + políticas RLS de ``rls_test.sql``. Es un ESPEJO DE PRUEBA
-  del diseño de ``db/design``; la migración real (Alembic) la entrega el DBA y debe pasar
-  estas mismas pruebas apuntando ``TEST_PG_ADMIN_URL`` a una BD migrada.
+- Esquema por defecto: ``Base.metadata.create_all`` + ``sql/rls_espejo_0001.sql`` (copia de las
+  políticas de la migración del DBA) + ``sql/propuesta_rls_por_usuario.sql`` (propuesta pendiente).
+  Para probar contra los SQL REALES del DBA: ``TEST_SCHEMA_SQL=ruta1:ruta2:...`` (se ejecutan en
+  orden como superusuario en lugar de lo anterior; p. ej. db/init.sql + la migración).
 - La app se conecta con un rol sin SUPERUSER ni BYPASSRLS y que no es dueño de las tablas.
 - Tokens: RS256 firmados con una clave generada en la sesión; JWKS local, sin Keycloak.
 - MinIO: almacenamiento falso en memoria; las URLs se firman con boto3 real (offline).
@@ -34,7 +35,8 @@ from app.config import settings
 from app.main import create_app
 from app.models import Base
 
-from tests.datos import (APP_ROLE, AUDIENCE, ISSUER, MEMBRESIAS, ORG_A, ORG_B, ORG_SUSP, ORG_V1_DEMO)
+from tests.datos import (APP_ROLE, AUDIENCE, ISSUER, MEMBRESIAS, ORG_A, ORG_B, ORG_SUSP, ORG_V1_DEMO,
+                         USUARIOS)
 
 APP_PASSWORD = 'solo_tests_' + uuid.uuid4().hex[:12]
 
@@ -84,14 +86,32 @@ def pg_admin_url():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+SQL_DIR = Path(__file__).parent / 'sql'
+
+
+def _schema_sql_files() -> list[Path] | None:
+    raw = os.environ.get('TEST_SCHEMA_SQL')
+    return [Path(p) for p in raw.split(os.pathsep) if p] if raw else None
+
+
 @pytest.fixture(scope='session')
 def admin_engine(pg_admin_url):
     eng = create_engine(pg_admin_url)
-    rls_sql = (Path(__file__).parent / 'rls_test.sql').read_text()
     with eng.begin() as conn:
-        conn.execute(text('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public'))
-        Base.metadata.create_all(conn)
-        conn.execute(text(f"""
+        conn.exec_driver_sql('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public')
+    archivos = _schema_sql_files()
+    if archivos:
+        for f in archivos:  # cada archivo gestiona su propia transacción (BEGIN/COMMIT)
+            with eng.connect() as conn:
+                conn.exec_driver_sql(f.read_text())
+                conn.commit()
+    else:
+        with eng.begin() as conn:
+            Base.metadata.create_all(conn)
+            for f in ('rls_espejo_0001.sql', 'propuesta_rls_por_usuario.sql'):
+                conn.exec_driver_sql((SQL_DIR / f).read_text())
+    with eng.begin() as conn:
+        conn.exec_driver_sql(f"""
             DO $$ BEGIN
               IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{APP_ROLE}') THEN
                 EXECUTE 'DROP OWNED BY {APP_ROLE}'; EXECUTE 'DROP ROLE {APP_ROLE}';
@@ -99,8 +119,9 @@ def admin_engine(pg_admin_url):
             END $$;
             CREATE ROLE {APP_ROLE} LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE
               PASSWORD '{APP_PASSWORD}';
-        """))
-        conn.execute(text(rls_sql.replace(':app_role', APP_ROLE)))
+            GRANT USAGE ON SCHEMA public TO {APP_ROLE};
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {APP_ROLE};
+        """)
     yield eng
     eng.dispose()
 
@@ -117,17 +138,22 @@ def app_engine(admin_engine, pg_admin_url):
 @pytest.fixture(autouse=False)
 def seed(admin_engine):
     with admin_engine.begin() as conn:
-        conn.execute(text('TRUNCATE inmueble_media, inmuebles, membresias, organizaciones CASCADE'))
+        conn.execute(text('TRUNCATE inmueble_media, inmuebles, membresias, usuarios, organizaciones CASCADE'))
         conn.execute(text("""
-            INSERT INTO organizaciones (id, slug, nombre, estatus) VALUES
+            INSERT INTO organizaciones (id, slug, nombre_comercial, estatus) VALUES
               (:a, 'demo-caracas', 'Inmobiliaria DEMO A (Caracas)', 'activa'),
               (:b, 'demo-valencia', 'Inmobiliaria DEMO B (Valencia)', 'activa'),
               (:s, 'demo-suspendida', 'Inmobiliaria DEMO suspendida', 'suspendida'),
               (:v, 'demo-v1', 'Organización DEMO v1', 'activa')
         """), {'a': ORG_A, 'b': ORG_B, 's': ORG_SUSP, 'v': ORG_V1_DEMO})
+        for sub in USUARIOS:
+            conn.execute(text("INSERT INTO usuarios (subject, email, nombre_completo, estado) "
+                              "VALUES (:s, :e, :n, 'activo')"),
+                         {'s': sub, 'e': f'{sub}@ejemplo.invalid', 'n': f'Usuario ficticio {sub}'})
         for org, sub, rol in MEMBRESIAS:
-            conn.execute(text('INSERT INTO membresias (organizacion_id, usuario_sub, rol, estatus) '
-                              "VALUES (:o, :s, :r, 'activa')"), {'o': org, 's': sub, 'r': rol})
+            conn.execute(text("INSERT INTO membresias (organizacion_id, usuario_id, rol, estatus) "
+                              "SELECT :o, id, :r, 'activa' FROM usuarios WHERE subject = :s"),
+                         {'o': org, 's': sub, 'r': rol})
 
 
 # ----------------------------------------------------------------------------- tokens
