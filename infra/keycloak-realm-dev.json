@@ -1,0 +1,191 @@
+{
+  "id": "crm-rah-dev",
+  "realm": "crm-rah-dev",
+  "displayName": "CRM RAH VZLA Dev Realm",
+  "displayNameHtml": "<b>CRM RAH VZLA</b> Development",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "propietario",
+        "description": "Propietario de la organización inmobiliaria"
+      },
+      {
+        "name": "gerente",
+        "description": "Gerente de agencia inmobiliaria"
+      },
+      {
+        "name": "asesor",
+        "description": "Asesor inmobiliario"
+      },
+      {
+        "name": "marketing",
+        "description": "Especialista de marketing"
+      },
+      {
+        "name": "consulta",
+        "description": "Acceso de solo lectura / consulta"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "name": "demo-caracas",
+      "path": "/demo-caracas",
+      "attributes": {
+        "organizacion_id": ["11111111-1111-4111-8111-111111111111"],
+        "nombre_comercial": ["Inmobiliaria Caracas DEMO"],
+        "slug": ["demo-caracas"]
+      }
+    },
+    {
+      "id": "22222222-2222-4222-8222-222222222222",
+      "name": "demo-valencia",
+      "path": "/demo-valencia",
+      "attributes": {
+        "organizacion_id": ["22222222-2222-4222-8222-222222222222"],
+        "nombre_comercial": ["Inmobiliaria Valencia DEMO"],
+        "slug": ["demo-valencia"]
+      }
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "crm-rah-app",
+      "name": "CRM RAH Frontend App & BFF",
+      "description": "Cliente OIDC público para la aplicación Next.js y BFF",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*##http://127.0.0.1:3000/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "organizaciones-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "organizaciones",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "organizaciones",
+            "jsonType.label": "String",
+            "multivalued": "true"
+          }
+        },
+        {
+          "name": "rol-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "rol",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "rol",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "e0000000-0000-4000-8000-000000000001",
+      "username": "usuario-a",
+      "email": "usuario-a@ejemplo.com",
+      "firstName": "Asesor",
+      "lastName": "Caracas",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev_password_123",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "organizaciones": ["11111111-1111-4111-8111-111111111111"],
+        "organizacion_principal": ["11111111-1111-4111-8111-111111111111"],
+        "rol": ["asesor"]
+      },
+      "realmRoles": ["asesor"],
+      "groups": ["/demo-caracas"]
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000002",
+      "username": "usuario-b",
+      "email": "usuario-b@ejemplo.com",
+      "firstName": "Asesor",
+      "lastName": "Valencia",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev_password_123",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "organizaciones": ["22222222-2222-4222-8222-222222222222"],
+        "organizacion_principal": ["22222222-2222-4222-8222-222222222222"],
+        "rol": ["asesor"]
+      },
+      "realmRoles": ["asesor"],
+      "groups": ["/demo-valencia"]
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000003",
+      "username": "usuario-ab",
+      "email": "usuario-ab@ejemplo.com",
+      "firstName": "Gerente",
+      "lastName": "Dual",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev_password_123",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "organizaciones": [
+          "11111111-1111-4111-8111-111111111111",
+          "22222222-2222-4222-8222-222222222222"
+        ],
+        "organizacion_principal": ["11111111-1111-4111-8111-111111111111"],
+        "rol": ["gerente"]
+      },
+      "realmRoles": ["gerente"],
+      "groups": ["/demo-caracas", "/demo-valencia"]
+    }
+  ]
+}
