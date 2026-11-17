@@ -1,6 +1,7 @@
 """Almacenamiento privado de medios (MinIO/S3).
 
-Claves: ``org/{organizacion_id}/inmuebles/{inmueble_id}/originales/{uuid}.{ext}``.
+Claves: ``organizaciones/{organizacion_id}/inmuebles/{inmueble_id}/originales/{uuid}.{ext}``
+(prefijo del ADR docs/ARQUITECTURA_MULTIAGENCIA.md).
 El prefijo NO sustituye la autorización: las URLs temporales solo se emiten después de verificar
 membresía + pertenencia del inmueble y del asset a la organización del request, y
 ``presign_get`` comprueba además que la clave esté bajo el prefijo de esa organización.
@@ -13,7 +14,7 @@ from botocore.config import Config
 
 from .config import settings
 
-PREFIJO_ORG = 'org'
+PREFIJO_ORG = 'organizaciones'
 
 
 def prefijo_organizacion(organizacion_id: UUID) -> str:

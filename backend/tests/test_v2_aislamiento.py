@@ -155,7 +155,7 @@ def test_org_inexistente_misma_respuesta(client, datos):
 
 def test_b_no_obtiene_url_firmada_de_a(client, datos, storage):
     ia = datos['ia']['id']
-    clave_a = next(k for k in storage.objetos if k.startswith(f'org/{ORG_A}/'))
+    clave_a = next(k for k in storage.objetos if k.startswith(f'organizaciones/{ORG_A}/'))
     storage.firmadas.clear()
     assert client.get(url(ORG_A, 'inmuebles', ia, 'media'), headers=datos['hb']).status_code == 403
     assert client.get(url(ORG_B, 'inmuebles', ia, 'media'), headers=datos['hb']).status_code == 404
@@ -165,19 +165,24 @@ def test_b_no_obtiene_url_firmada_de_a(client, datos, storage):
 def test_claves_minio_con_prefijo_de_org(client, datos, storage):
     ia, ib = datos['ia']['id'], datos['ib']['id']
     claves = list(storage.objetos)
-    assert any(k.startswith(f'org/{ORG_A}/inmuebles/{ia}/originales/') for k in claves)
-    assert any(k.startswith(f'org/{ORG_B}/inmuebles/{ib}/originales/') for k in claves)
+    assert any(k.startswith(f'organizaciones/{ORG_A}/inmuebles/{ia}/originales/') for k in claves)
+    assert any(k.startswith(f'organizaciones/{ORG_B}/inmuebles/{ib}/originales/') for k in claves)
     r = client.get(url(ORG_A, 'inmuebles', ia, 'media'), headers=datos['ha'])
     assert r.status_code == 200 and len(r.json()) == 1
     path = urlparse(r.json()[0]['url_temporal']).path
-    assert f'/org/{ORG_A}/inmuebles/{ia}/' in path
+    assert f'/organizaciones/{ORG_A}/inmuebles/{ia}/' in path
     assert 'X-Amz-Expires=900' in r.json()[0]['url_temporal']
 
 
 def test_presign_rechaza_clave_de_otra_org(storage):
     from app.storage import ClaveFueraDeOrganizacion
     with pytest.raises(ClaveFueraDeOrganizacion):
-        storage.presign_get(ORG_B, f'org/{ORG_A}/inmuebles/x/originales/y.png')
+        storage.presign_get(ORG_B, f'organizaciones/{ORG_A}/inmuebles/x/originales/y.png')
+
+
+def test_alias_organizaciones_retirado(client, auth_header):
+    # Decisión del integrador: solo existe la ruta del contrato /api/v2/me/organizaciones.
+    assert client.get('/api/v2/organizaciones', headers=auth_header(SUB_A)).status_code in (404, 405)
 
 
 def test_upload_valida_contenido(client, datos):
@@ -189,7 +194,7 @@ def test_upload_valida_contenido(client, datos):
 # ------------------------------------------------- Sin sesión: 401
 
 @pytest.mark.parametrize('metodo,ruta', [
-    ('get', '/api/v2/me'), ('get', '/api/v2/organizaciones'), ('get', '/api/v2/me/organizaciones'),
+    ('get', '/api/v2/me'), ('get', '/api/v2/me/organizaciones'),
     ('get', url(ORG_A)), ('get', url(ORG_A, 'inmuebles')), ('post', url(ORG_A, 'inmuebles')),
     ('get', url(ORG_A, 'inmuebles', '11111111-0000-4000-8000-000000000000')),
     ('get', url(ORG_A, 'inmuebles', '11111111-0000-4000-8000-000000000000', 'media')),
@@ -270,7 +275,7 @@ def test_usuario_desactivado_403(client, datos, admin_engine):
 def test_organizacion_suspendida_403(client, auth_header):
     h = auth_header(SUB_SUSP)
     assert client.get(url(ORG_SUSP, 'inmuebles'), headers=h).status_code == 403
-    assert client.get('/api/v2/organizaciones', headers=h).json() == []
+    assert client.get('/api/v2/me/organizaciones', headers=h).json() == []
 
 
 # ------------------------------------------------- Usuario con dos membresías ve solo la org seleccionada
@@ -281,8 +286,7 @@ def test_usuario_dual_ve_solo_org_seleccionada(client, datos, auth_header):
     assert me['sub'] == SUB_AB
     assert {o['id'] for o in me['organizaciones']} == {str(ORG_A), str(ORG_B)}
     assert all(o['rol'] == 'gerente' for o in me['organizaciones'])
-    for ruta in ('/api/v2/organizaciones', '/api/v2/me/organizaciones'):
-        assert {o['id'] for o in client.get(ruta, headers=h).json()} == {str(ORG_A), str(ORG_B)}
+    assert {o['id'] for o in client.get('/api/v2/me/organizaciones', headers=h).json()} == {str(ORG_A), str(ORG_B)}
 
     la = client.get(url(ORG_A, 'inmuebles'), headers=h).json()
     lb = client.get(url(ORG_B, 'inmuebles'), headers=h).json()

@@ -77,7 +77,6 @@ def me(usuario: Usuario = Depends(get_current_user), db: Session = Depends(get_d
 
 
 @router.get('/me/organizaciones', response_model=list[OrganizacionOut])
-@router.get('/organizaciones', response_model=list[OrganizacionOut])
 def mis_organizaciones(usuario: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     return _organizaciones_de(db, usuario)
 
@@ -92,7 +91,7 @@ def leer_organizacion(ctx: Contexto = Depends(requiere(LEER)), db: Session = Dep
 def revocar_membresia(
     membresia_id: UUID, ctx: Contexto = Depends(requiere(GESTIONAR_MIEMBROS)), db: Session = Depends(get_db),
 ):
-    """PROPUESTA fuera del contrato v2 actual (lo exige la matriz de aceptación).
+    """Aprobado por el integrador (2026-11-17) para la matriz de aceptación; solo propietario.
     No borra la fila: la marca `inactiva` (valor del CHECK de la migración 0001)."""
     membresia = db.scalar(
         select(Membresia).where(Membresia.organizacion_id == ctx.organizacion_id, Membresia.id == membresia_id)

@@ -4,8 +4,8 @@
   si no, se crea un cluster temporal con ``initdb``/``pg_ctl`` (``PG_BIN`` o
   ``/Library/PostgreSQL/16/bin``, ``/usr/lib/postgresql/16/bin``). Sin PostgreSQL disponible,
   las pruebas de integración se OMITEN (skip) indicándolo; nunca se simulan con SQLite.
-- Esquema por defecto: ``Base.metadata.create_all`` + ``sql/rls_espejo_0001.sql`` (copia de las
-  políticas de la migración del DBA) + ``sql/propuesta_rls_por_usuario.sql`` (propuesta pendiente).
+- Esquema por defecto: ``Base.metadata.create_all`` + ``sql/rls_espejo_0001.sql`` y
+  ``sql/rls_espejo_0002.sql`` (copias de las políticas de las migraciones del DBA).
   Para probar contra los SQL REALES del DBA: ``TEST_SCHEMA_SQL=ruta1:ruta2:...`` (se ejecutan en
   orden como superusuario en lugar de lo anterior; p. ej. db/init.sql + la migración).
 - La app se conecta con un rol sin SUPERUSER ni BYPASSRLS y que no es dueño de las tablas.
@@ -108,7 +108,7 @@ def admin_engine(pg_admin_url):
     else:
         with eng.begin() as conn:
             Base.metadata.create_all(conn)
-            for f in ('rls_espejo_0001.sql', 'propuesta_rls_por_usuario.sql'):
+            for f in ('rls_espejo_0001.sql', 'rls_espejo_0002.sql'):
                 conn.exec_driver_sql((SQL_DIR / f).read_text())
     with eng.begin() as conn:
         conn.exec_driver_sql(f"""
