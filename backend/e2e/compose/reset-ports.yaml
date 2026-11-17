@@ -1,0 +1,7 @@
+services:
+  keycloak:
+    ports: !reset []
+  backend:
+    ports: !reset []
+  postgres:
+    ports: !reset []

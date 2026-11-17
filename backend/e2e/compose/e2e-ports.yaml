@@ -1,0 +1,10 @@
+services:
+  keycloak:
+    ports:
+      - "127.0.0.1:18080:8080"
+  backend:
+    ports:
+      - "127.0.0.1:18000:8000"
+  postgres:
+    ports:
+      - "127.0.0.1:15432:5432"
