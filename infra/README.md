@@ -58,14 +58,52 @@ Keycloak levanta en `http://localhost:8080` e importa automáticamente el realm 
 | `usuario-b` | `dev_password_123` | Solo Org Valencia (`22222222-...`) | `asesor` |
 | `usuario-ab` | `dev_password_123` | Ambas: Caracas y Valencia | `gerente` |
 
-### Prueba de obtención de Token JWT (vía Direct Access Grant / Password):
+### Obtención de Tokens JWT para los usuarios de prueba (Solo Desarrollo)
+
+> [!WARNING]
+> Estas credenciales y el flujo `grant_type=password` son exclusivamente para pruebas locales en desarrollo. En producción, la autenticación debe realizarse mediante OIDC Authorization Code con PKCE.
+
+#### 1. Token para `usuario-a` (Org Caracas):
 ```bash
-curl -s -X POST "http://localhost:8080/realms/crm-rah-dev/protocol/openid-connect/token" \
+TOKEN_A=$(curl -s -X POST "http://localhost:8080/realms/crm-rah-dev/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password" \
   -d "client_id=crm-rah-app" \
   -d "username=usuario-a" \
-  -d "password=dev_password_123" | jq .access_token
+  -d "password=dev_password_123" | jq -r .access_token)
+echo "$TOKEN_A"
+```
+
+#### 2. Token para `usuario-b` (Org Valencia):
+```bash
+TOKEN_B=$(curl -s -X POST "http://localhost:8080/realms/crm-rah-dev/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password" \
+  -d "client_id=crm-rah-app" \
+  -d "username=usuario-b" \
+  -d "password=dev_password_123" | jq -r .access_token)
+echo "$TOKEN_B"
+```
+
+#### 3. Token para `usuario-ab` (Dual: Caracas y Valencia):
+```bash
+TOKEN_AB=$(curl -s -X POST "http://localhost:8080/realms/crm-rah-dev/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password" \
+  -d "client_id=crm-rah-app" \
+  -d "username=usuario-ab" \
+  -d "password=dev_password_123" | jq -r .access_token)
+echo "$TOKEN_AB"
+```
+
+#### Inspección del Payload del Token (sin verificar firma):
+```bash
+# Decodificar el payload Base64 del JWT:
+echo "$TOKEN_A" | cut -d'.' -f2 | base64 --decode 2>/dev/null | jq .
+# Verificar:
+# iss: http://localhost:8080/realms/crm-rah-dev
+# aud: ["crm-rah-api", ...] o "crm-rah-api"
+# sub: e0000000-0000-4000-8000-000000000001
 ```
 
 ---
@@ -76,7 +114,15 @@ La configuración de Alembic reside en `db/alembic.ini` y `db/alembic/`.
 
 ### Migraciones disponibles:
 1. `0001_sprint02_multiagencia`: Esquema inicial multi-tenant, tablas base, `organizacion_id NOT NULL`, FK compuestas, RLS y rol `rah_app`.
-2. `0002_rls_usuario_lectura`: Políticas RLS `PERMISSIVE` de lectura por usuario (`app.usuario_sub`) para `membresias` y `organizaciones`, permitiendo al backend verificar membresías antes de fijar `app.organizacion_id` y listar agencias en `/api/v2/me`.
+2. `0002_rls_usuario_lectura`: Políticas RLS `PERMISSIVE` de lectura por usuario (`app.usuario_sub`) para `membresias` y `organizaciones`, y corrección idempotente de `usuarios.subject` para bases donde `0001` ya se aplicó.
+
+### Corrección de `usuarios.subject` en volúmenes existentes:
+Si un volumen de base de datos ya había ejecutado la migración `0001` con el subject antiguo (username en vez de UUID), la migración `0002` incluye automáticamente la actualización idempotente:
+```sql
+UPDATE usuarios SET subject = 'e0000000-0000-4000-8000-000000000001' WHERE email = 'usuario-a@ejemplo.com';
+UPDATE usuarios SET subject = 'e0000000-0000-4000-8000-000000000002' WHERE email = 'usuario-b@ejemplo.com';
+UPDATE usuarios SET subject = 'e0000000-0000-4000-8000-000000000003' WHERE email = 'usuario-ab@ejemplo.com';
+```
 
 ### Aplicar migraciones con Alembic:
 ```bash
