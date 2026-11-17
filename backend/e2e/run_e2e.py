@@ -83,6 +83,7 @@ def main() -> int:
 
     # --- identidad real
     ta, tb, tab = token('usuario-a'), token('usuario-b'), token('usuario-ab')
+    tprop, tmkt = token('usuario-propietario'), token('usuario-marketing')
     ca = claims(ta)
     aud = ca['aud'] if isinstance(ca['aud'], list) else [ca['aud']]
     check('Identidad', 'token real Keycloak: iss/aud/sub', 'crm-rah-api' in aud,
@@ -159,12 +160,17 @@ def main() -> int:
     r = c.get(f'{API}/api/v2/me', headers={'Authorization': 'Bearer ' + ta[:-6] + 'AAAAAA'})
     check('Sin sesión', 'token con firma alterada → 401', r.status_code == 401, str(r.status_code))
 
-    # --- 6. rol insuficiente (no hay usuario marketing en el realm DEV: se usa asesor)
+    # --- 6. rol insuficiente
     with psycopg.connect(ADMIN_DB) as db:
         m_b = db.execute("SELECT m.id FROM membresias m JOIN usuarios u ON u.id = m.usuario_id "
                          "WHERE u.subject = %s AND m.organizacion_id = %s", (claims(tab)['sub'], CARACAS)).fetchone()[0]
+    r = c.delete(url(CARACAS, 'membresias', m_b), headers=h(tmkt))
+    check('Rol insuficiente', 'marketing intenta borrar miembro → 403', r.status_code == 403, str(r.status_code))
     r = c.delete(url(CARACAS, 'membresias', m_b), headers=h(ta))
-    check('Rol insuficiente', 'asesor intenta borrar la membresía de otro → 403', r.status_code == 403, str(r.status_code))
+    check('Rol insuficiente', 'asesor intenta borrar miembro → 403', r.status_code == 403, str(r.status_code))
+    r = c.post(url(CARACAS, 'inmuebles', ia, 'media'), headers=h(tmkt),
+                            files={'archivo': ('m.png', png(), 'image/png')})
+    check('Rol insuficiente', 'marketing intenta subir foto → 403', r.status_code == 403, str(r.status_code))
     r = c.patch(url(CARACAS, 'inmuebles', ia), json={'titulo': 'Cambio no permitido'}, headers=h(ta))
     check('Rol insuficiente', 'asesor intenta editar → 403', r.status_code == 403, str(r.status_code))
 
@@ -183,21 +189,20 @@ def main() -> int:
         r = c.get(API + ruta)
         check('API v1 deshabilitada', f'GET {ruta} → 404', r.status_code == 404 and 'DEMO' not in r.text, str(r.status_code))
 
-    # --- 9. revocación con sesión abierta (simulada en BD: no hay propietario en el realm DEV)
-    sub_ab = claims(tab)['sub']
-    with psycopg.connect(ADMIN_DB) as db:
-        db.execute("UPDATE membresias SET estatus = 'inactiva' WHERE organizacion_id = %s AND usuario_id = "
-                   "(SELECT id FROM usuarios WHERE subject = %s)", (CARACAS, sub_ab))
+    # --- 9. revocación con sesión abierta: el propietario revoca vía API
+    r0 = c.get(url(CARACAS, 'inmuebles'), headers=h(tab))
+    rd = c.delete(url(CARACAS, 'membresias', m_b), headers=h(tprop))
+    check('Revocación con sesión abierta', 'propietario revoca membresía Caracas de usuario-ab → 204',
+          r0.status_code == 200 and rd.status_code == 204, f'{r0.status_code}/{rd.status_code}')
     try:
         r1 = c.get(url(CARACAS, 'inmuebles'), headers=h(tab))
         r2 = c.get(url(VALENCIA, 'inmuebles'), headers=h(tab))
-        check('Revocación con sesión abierta', 'mismo token, membresía Caracas inactiva → 403', r1.status_code == 403,
+        check('Revocación con sesión abierta', 'mismo token, siguiente request en Caracas → 403', r1.status_code == 403,
               str(r1.status_code))
         check('Revocación con sesión abierta', 'membresía Valencia intacta → 200', r2.status_code == 200, str(r2.status_code))
-    finally:
+    finally:  # restaurar el estado DEV (no hay endpoint de reactivación)
         with psycopg.connect(ADMIN_DB) as db:
-            db.execute("UPDATE membresias SET estatus = 'activa' WHERE organizacion_id = %s AND usuario_id = "
-                       "(SELECT id FROM usuarios WHERE subject = %s)", (CARACAS, sub_ab))
+            db.execute("UPDATE membresias SET estatus = 'activa' WHERE id = %s", (m_b,))
 
     # --- 10. RLS / pool: tras A y B, conexión del rol de app sin contexto no ve filas
     for _ in range(3):
@@ -234,10 +239,8 @@ def escribir(path: str, ca: dict) -> None:
         '',
         '## Limitaciones de esta corrida',
         '',
-        '- El realm DEV no tiene usuarios `marketing` ni `propietario`: el 403 por rol se probó con `asesor`;'
-        ' el caso exacto `marketing` y el DELETE de membresías por propietario están cubiertos por los tests'
-        ' de integración (`tests/test_v2_aislamiento.py`).',
-        '- La revocación se simuló marcando la membresía `inactiva` en BD (y se restauró), con el token ya emitido.',
+        '- Tras la revocación, la membresía se reactiva directamente en BD para dejar el entorno DEV como estaba'
+        ' (no existe endpoint de reactivación).',
         '- Datos 100 % ficticios.',
     ]
     with open(path, 'w') as f:
