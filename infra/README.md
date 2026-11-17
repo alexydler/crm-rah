@@ -57,6 +57,8 @@ Keycloak levanta en `http://localhost:8080` e importa automáticamente el realm 
 | `usuario-a` | `dev_password_123` | Solo Org Caracas (`11111111-...`) | `asesor` |
 | `usuario-b` | `dev_password_123` | Solo Org Valencia (`22222222-...`) | `asesor` |
 | `usuario-ab` | `dev_password_123` | Ambas: Caracas y Valencia | `gerente` |
+| `usuario-propietario` | `dev_password_123` | Solo Org Caracas (`11111111-...`) | `propietario` |
+| `usuario-marketing` | `dev_password_123` | Solo Org Caracas (`11111111-...`) | `marketing` |
 
 ### Obtención de Tokens JWT para los usuarios de prueba (Solo Desarrollo)
 
