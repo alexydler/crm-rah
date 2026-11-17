@@ -18,7 +18,9 @@ INSERT INTO usuarios (id, proveedor_auth, subject, email, nombre_completo, estad
 VALUES
     ('e0000000-0000-4000-8000-000000000001', 'keycloak', 'e0000000-0000-4000-8000-000000000001', 'usuario-a@ejemplo.com', 'Asesor Caracas', 'activo'),
     ('e0000000-0000-4000-8000-000000000002', 'keycloak', 'e0000000-0000-4000-8000-000000000002', 'usuario-b@ejemplo.com', 'Asesor Valencia', 'activo'),
-    ('e0000000-0000-4000-8000-000000000003', 'keycloak', 'e0000000-0000-4000-8000-000000000003', 'usuario-ab@ejemplo.com', 'Gerente Dual', 'activo')
+    ('e0000000-0000-4000-8000-000000000003', 'keycloak', 'e0000000-0000-4000-8000-000000000003', 'usuario-ab@ejemplo.com', 'Gerente Dual', 'activo'),
+    ('e0000000-0000-4000-8000-000000000004', 'keycloak', 'e0000000-0000-4000-8000-000000000004', 'usuario-propietario@ejemplo.com', 'Propietario Caracas', 'activo'),
+    ('e0000000-0000-4000-8000-000000000005', 'keycloak', 'e0000000-0000-4000-8000-000000000005', 'usuario-marketing@ejemplo.com', 'Marketing Caracas', 'activo')
 ON CONFLICT (id) DO UPDATE
     SET subject = EXCLUDED.subject,
         email = EXCLUDED.email;
@@ -27,12 +29,15 @@ ON CONFLICT (id) DO UPDATE
 -- usuario-a: solo Org Caracas (asesor)
 -- usuario-b: solo Org Valencia (asesor)
 -- usuario-ab: ambas organizaciones (gerente)
+-- usuario-propietario: solo Org Caracas (propietario) · usuario-marketing: solo Org Caracas (marketing)
 INSERT INTO membresias (id, organizacion_id, usuario_id, rol, estatus)
 VALUES
     ('f0000000-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'e0000000-0000-4000-8000-000000000001', 'asesor', 'activa'),
     ('f0000000-0000-4000-8000-000000000002', '22222222-2222-4222-8222-222222222222', 'e0000000-0000-4000-8000-000000000002', 'asesor', 'activa'),
     ('f0000000-0000-4000-8000-000000000003', '11111111-1111-4111-8111-111111111111', 'e0000000-0000-4000-8000-000000000003', 'gerente', 'activa'),
-    ('f0000000-0000-4000-8000-000000000004', '22222222-2222-4222-8222-222222222222', 'e0000000-0000-4000-8000-000000000003', 'gerente', 'activa')
+    ('f0000000-0000-4000-8000-000000000004', '22222222-2222-4222-8222-222222222222', 'e0000000-0000-4000-8000-000000000003', 'gerente', 'activa'),
+    ('f0000000-0000-4000-8000-000000000005', '11111111-1111-4111-8111-111111111111', 'e0000000-0000-4000-8000-000000000004', 'propietario', 'activa'),
+    ('f0000000-0000-4000-8000-000000000006', '11111111-1111-4111-8111-111111111111', 'e0000000-0000-4000-8000-000000000005', 'marketing', 'activa')
 ON CONFLICT (organizacion_id, usuario_id) DO UPDATE
     SET rol = EXCLUDED.rol,
         estatus = EXCLUDED.estatus;

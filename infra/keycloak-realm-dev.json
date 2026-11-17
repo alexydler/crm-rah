@@ -197,6 +197,52 @@
       },
       "realmRoles": ["gerente"],
       "groups": ["/demo-caracas", "/demo-valencia"]
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000004",
+      "username": "usuario-propietario",
+      "email": "usuario-propietario@ejemplo.com",
+      "firstName": "Propietario",
+      "lastName": "Caracas",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev_password_123",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "organizaciones": ["11111111-1111-4111-8111-111111111111"],
+        "organizacion_principal": ["11111111-1111-4111-8111-111111111111"],
+        "rol": ["propietario"]
+      },
+      "realmRoles": ["propietario"],
+      "groups": ["/demo-caracas"]
+    },
+    {
+      "id": "e0000000-0000-4000-8000-000000000005",
+      "username": "usuario-marketing",
+      "email": "usuario-marketing@ejemplo.com",
+      "firstName": "Marketing",
+      "lastName": "Caracas",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "dev_password_123",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "organizaciones": ["11111111-1111-4111-8111-111111111111"],
+        "organizacion_principal": ["11111111-1111-4111-8111-111111111111"],
+        "rol": ["marketing"]
+      },
+      "realmRoles": ["marketing"],
+      "groups": ["/demo-caracas"]
     }
   ]
 }

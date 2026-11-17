@@ -19,7 +19,17 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Políticas PERMISSIVE de lectura por usuario (app.usuario_sub)
+    # 1. Corrección idempotente de subject para bases de datos donde 0001 se aplicó previamente
+    op.execute("""
+        UPDATE usuarios SET subject = 'e0000000-0000-4000-8000-000000000001'
+            WHERE email = 'usuario-a@ejemplo.com' AND subject <> 'e0000000-0000-4000-8000-000000000001';
+        UPDATE usuarios SET subject = 'e0000000-0000-4000-8000-000000000002'
+            WHERE email = 'usuario-b@ejemplo.com' AND subject <> 'e0000000-0000-4000-8000-000000000002';
+        UPDATE usuarios SET subject = 'e0000000-0000-4000-8000-000000000003'
+            WHERE email = 'usuario-ab@ejemplo.com' AND subject <> 'e0000000-0000-4000-8000-000000000003';
+    """)
+
+    # 2. Políticas PERMISSIVE de lectura por usuario (app.usuario_sub)
     # Permiten verificar membresía antes de fijar app.organizacion_id y listar organizaciones del usuario en /api/v2/me
     op.execute("""
         DROP POLICY IF EXISTS membresias_propias_lectura ON membresias;
