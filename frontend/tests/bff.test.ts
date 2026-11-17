@@ -1,0 +1,41 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { NextRequest } from "next/server";
+import { createSession, getSession, SESSION_COOKIE } from "../app/lib/server/session";
+
+test("BFF real: bearer solo servidor, CSRF, rutas permitidas y 401 tardío", async t => {
+  const previous = process.env.NEXT_PUBLIC_USE_MOCKS;
+  process.env.NEXT_PUBLIC_USE_MOCKS = "false";
+  t.after(() => { if (previous === undefined) delete process.env.NEXT_PUBLIC_USE_MOCKS; else process.env.NEXT_PUBLIC_USE_MOCKS = previous; });
+  const { GET, POST } = await import("../app/api/v2/[...path]/route");
+  const session = createSession("DEMO-token-servidor", 60);
+  const newerSession = createSession("DEMO-token-nuevo", 60);
+  const org = "11111111-1111-4111-8111-111111111111";
+  const path = `/api/v2/organizaciones/${org}/inmuebles`;
+  let status = 200;
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async (url: URL, options: RequestInit) => {
+    calls++;
+    assert.equal(url.pathname, path);
+    assert.equal(new Headers(options.headers).get("authorization"), "Bearer DEMO-token-servidor");
+    assert.equal(new Headers(options.headers).get("x-organization-id"), null);
+    return Response.json(status === 200 ? [] : { detail: "error ficticio privado" }, { status });
+  });
+  const headers = { cookie: `${SESSION_COOKIE}=${session}`, authorization: "Bearer NO-CONFIAR-CLIENTE" };
+  assert.equal((await GET(new NextRequest(`http://localhost:3000${path}`, { headers }))).status, 200);
+  assert.equal((await POST(new NextRequest(`http://localhost:3000${path}`, { method: "POST", headers: { ...headers, origin: "https://ajeno.invalid", "content-type": "application/json" }, body: "{}" }))).status, 403);
+  assert.equal(calls, 1);
+  assert.equal((await GET(new NextRequest("http://localhost:3000/api/v2/miembros", { headers }))).status, 404);
+  status = 503;
+  const unavailable = await GET(new NextRequest(`http://localhost:3000${path}`, { headers }));
+  assert.equal(unavailable.status, 503);
+  assert.equal(unavailable.headers.get("set-cookie"), null);
+  assert.ok(getSession(session), "un 503 no cierra la sesión BFF");
+  status = 401;
+  const expired = await GET(new NextRequest(`http://localhost:3000${path}`, { headers }));
+  assert.equal(expired.status, 401);
+  assert.equal(expired.headers.get("set-cookie"), null);
+  assert.equal(getSession(session), undefined);
+  assert.ok(getSession(newerSession), "un 401 de la sesión antigua no revoca la nueva");
+  assert.ok(!(await expired.text()).includes("privado"));
+});
