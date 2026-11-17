@@ -1,0 +1,11 @@
+# SOLO E2E LOCAL: las imágenes minio/minio y minio/mc ya no son públicas (Docker Hub/Quay
+# responden "access denied"). Se usa la compilación de Chainguard del mismo MinIO.
+services:
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+  minio-init:
+    image: cgr.dev/chainguard/minio-client:latest
+    entrypoint: ["mc"]
+    command: ["mb", "--ignore-existing", "local/${S3_BUCKET}"]
+    environment:
+      MC_HOST_local: http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000
