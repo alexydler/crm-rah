@@ -123,6 +123,53 @@ ROLLBACK;
 RESET ROLE;
 
 \echo ''
+\echo '>>> TEST 6: Lectura de membresías y organizaciones por usuario autenticado (app.usuario_sub)'
+SET ROLE rah_app;
+BEGIN;
+-- Sin app.usuario_sub ni app.organizacion_id -> 0 filas
+SELECT count(*) AS membresias_anonimo FROM membresias;
+DO $$
+DECLARE cnt INT;
+BEGIN
+    SELECT count(*) INTO cnt FROM membresias;
+    IF cnt <> 0 THEN
+        RAISE EXCEPTION 'TEST 6 FALLÓ: Se esperaban 0 membresías para anónimo, se obtuvieron %', cnt;
+    END IF;
+END $$;
+
+-- Usuario A (e0000000-0000-4000-8000-000000000001) -> 1 membresía (Caracas), 1 organización
+SET LOCAL app.usuario_sub = 'e0000000-0000-4000-8000-000000000001';
+DO $$
+DECLARE
+    cnt_m INT;
+    cnt_o INT;
+BEGIN
+    SELECT count(*) INTO cnt_m FROM membresias;
+    SELECT count(*) INTO cnt_o FROM organizaciones;
+    IF cnt_m <> 1 OR cnt_o <> 1 THEN
+        RAISE EXCEPTION 'TEST 6 FALLÓ: Usuario A debía ver 1 membresía y 1 org, obtuvo m=%, o=%', cnt_m, cnt_o;
+    END IF;
+    RAISE NOTICE 'TEST 6.A SUPERADO: Usuario A ve únicamente su membresía de Caracas y su org.';
+END $$;
+
+-- Usuario AB (e0000000-0000-4000-8000-000000000003) -> 2 membresías, 2 organizaciones
+SET LOCAL app.usuario_sub = 'e0000000-0000-4000-8000-000000000003';
+DO $$
+DECLARE
+    cnt_m INT;
+    cnt_o INT;
+BEGIN
+    SELECT count(*) INTO cnt_m FROM membresias;
+    SELECT count(*) INTO cnt_o FROM organizaciones;
+    IF cnt_m <> 2 OR cnt_o <> 2 THEN
+        RAISE EXCEPTION 'TEST 6 FALLÓ: Usuario AB debía ver 2 membresías y 2 orgs, obtuvo m=%, o=%', cnt_m, cnt_o;
+    END IF;
+    RAISE NOTICE 'TEST 6.B SUPERADO: Usuario AB ve sus 2 membresías y sus 2 orgs (Caracas y Valencia).';
+END $$;
+ROLLBACK;
+RESET ROLE;
+
+\echo ''
 \echo '----------------------------------------------------------------------'
 \echo '¡TODAS LAS PRUEBAS DE ROW LEVEL SECURITY (RLS) COMPLETADAS CON ÉXITO!'
 \echo '----------------------------------------------------------------------'

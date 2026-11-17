@@ -16,9 +16,9 @@ ON CONFLICT (id) DO UPDATE
 -- 2. Usuarios de prueba (alineados con Keycloak OIDC)
 INSERT INTO usuarios (id, proveedor_auth, subject, email, nombre_completo, estado)
 VALUES
-    ('e0000000-0000-4000-8000-000000000001', 'keycloak', 'usuario-a', 'usuario-a@ejemplo.com', 'Asesor Caracas', 'activo'),
-    ('e0000000-0000-4000-8000-000000000002', 'keycloak', 'usuario-b', 'usuario-b@ejemplo.com', 'Asesor Valencia', 'activo'),
-    ('e0000000-0000-4000-8000-000000000003', 'keycloak', 'usuario-ab', 'usuario-ab@ejemplo.com', 'Gerente Dual', 'activo')
+    ('e0000000-0000-4000-8000-000000000001', 'keycloak', 'e0000000-0000-4000-8000-000000000001', 'usuario-a@ejemplo.com', 'Asesor Caracas', 'activo'),
+    ('e0000000-0000-4000-8000-000000000002', 'keycloak', 'e0000000-0000-4000-8000-000000000002', 'usuario-b@ejemplo.com', 'Asesor Valencia', 'activo'),
+    ('e0000000-0000-4000-8000-000000000003', 'keycloak', 'e0000000-0000-4000-8000-000000000003', 'usuario-ab@ejemplo.com', 'Gerente Dual', 'activo')
 ON CONFLICT (id) DO UPDATE
     SET subject = EXCLUDED.subject,
         email = EXCLUDED.email;

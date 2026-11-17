@@ -74,6 +74,10 @@ curl -s -X POST "http://localhost:8080/realms/crm-rah-dev/protocol/openid-connec
 
 La configuración de Alembic reside en `db/alembic.ini` y `db/alembic/`.
 
+### Migraciones disponibles:
+1. `0001_sprint02_multiagencia`: Esquema inicial multi-tenant, tablas base, `organizacion_id NOT NULL`, FK compuestas, RLS y rol `rah_app`.
+2. `0002_rls_usuario_lectura`: Políticas RLS `PERMISSIVE` de lectura por usuario (`app.usuario_sub`) para `membresias` y `organizaciones`, permitiendo al backend verificar membresías antes de fijar `app.organizacion_id` y listar agencias en `/api/v2/me`.
+
 ### Aplicar migraciones con Alembic:
 ```bash
 # Estando en el directorio db/ o con DATABASE_URL configurada:
@@ -85,6 +89,7 @@ alembic upgrade head
 Si no dispones del entorno Python/Alembic en tu máquina anfitriona:
 ```bash
 docker compose exec -T postgres psql -U rah_dev -d rah_vzla < db/migrations/0001_sprint02_multiagencia.sql
+docker compose exec -T postgres psql -U rah_dev -d rah_vzla < db/migrations/0002_rls_usuario_lectura.sql
 docker compose exec -T postgres psql -U rah_dev -d rah_vzla < db/seeds/0001_sprint02_seeds.sql
 ```
 
@@ -95,6 +100,7 @@ cd db
 alembic downgrade -1
 
 # O con SQL:
+docker compose exec -T postgres psql -U rah_dev -d rah_vzla < db/migrations/0002_rls_usuario_lectura_down.sql
 docker compose exec -T postgres psql -U rah_dev -d rah_vzla < db/migrations/0001_sprint02_multiagencia_down.sql
 ```
 
